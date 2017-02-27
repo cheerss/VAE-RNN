@@ -6,7 +6,7 @@ from utils import *
 from sys import stderr
 
 DEBUG = False
-width, height, channel = 256, 256, 1
+width, height, channel = 256, 256, 3
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 10
@@ -23,30 +23,31 @@ STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 def main():
 	g = tf.Graph()
 	with g.as_default(), tf.Session() as sess:
-		x = tf.placeholder(tf.float32, shape=(1, img_size))
+		x = tf.placeholder(tf.float32, shape=(1, img_size * channel))
 		# x_reconstr = tf.placeholder(tf.float32, shape=(1, img_size, channel))
 
 		img = imread("img/1-style.jpg")
-		stderr.write(str(img.shape))
+		stderr.write('img shape: ' + str(img.shape) + '\n')
 		img_resize = imresize(img, [256, 256])
 		img_float = img_resize.astype('float') / 255
 		imsave('img_resize/1-style.jpg', img_resize)
 		stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
 
 		x_reconstr, Lz = reconstruct(x)
-		x_reshape = tf.reshape(x, [batch_size, width, height])
-		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height])
+		x_reshape = tf.reshape(x, [batch_size, width, height, channel])
+		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height, channel])
 		Ls = style_loss(x_reshape, x_reconstr_reshape)
 		loss = Lz + Ls
 
-		train_step = tf.train.Optimizer().minimize(loss)
+		train_step = tf.train.AdamOptimizer().minimize(loss)
+		sess.run(tf.initialize_all_variables())
 
 		for i in range(1000):
-			feed_dict = {x: img_float}
+			feed_dict = { x: np.reshape(img_float, [1, -1]) }
 			sess.run(train_step, feed_dict)
 			stderr.write("Lz is " + Lz.eval() + "  Ls is " + Ls.eval() + "\n")
 			if i % 10 == 0:
-				img_reconstr = x_reconstr.eval()
+				img_reconstr = x_reconstr_reshape.eval()
 				img_reconstr = (img_reconstr * 255).astype('int')
 				imsave('img_reconstr/1-style-' + i + '.jpg', img_reconstr)
 
@@ -57,8 +58,8 @@ def style_loss(x, x_reconstr):
 	for layer in STYLE_LAYERS:
 		feature = net[layer]
 		size_origin = feature.get_shape().as_list()
-		stderr.write('origin size is ' + size_origin + '\n')
-		feature = tf.feature(feature, (-1, size_origin[3]))
+		stderr.write('origin size is ' + str(size_origin) + '\n')
+		feature = tf.reshape(feature, (-1, size_origin[3]))
 		gram = tf.matmul(tf.transpose(feature), feature)
 		style_features[layer] = gram
 	x_grams = style_features
@@ -67,7 +68,7 @@ def style_loss(x, x_reconstr):
 	for layer in STYLE_LAYERS:
 		feature = net[layer]
 		size_origin = feature.get_shape().as_list()
-		feature = tf.feature(feature, (-1, size_origin[3]))
+		feature = tf.reshape(feature, (-1, size_origin[3]))
 		gram = tf.matmul(tf.transpose(feature), feature)
 		style_features[layer] = gram
 
@@ -87,7 +88,7 @@ def reconstruct(x):
 	dec_state = decoder.zero_state(1, tf.float32)
 
 	for t in range(T):
-		c_prev = tf.zeros((1, img_size)) if t == 0 else c[t-1]
+		c_prev = tf.zeros((1, img_size * channel)) if t == 0 else c[t-1]
 		x_hat = x - tf.sigmoid(c_prev)
 		r = read(x, x_hat, h_dec_prev, atten)
 		h_enc, enc_state = encode(tf.concat([r, h_dec_prev], 1), enc_state)
@@ -110,7 +111,7 @@ def reconstruct(x):
 
 def linear(x, output_dim):
 	w = tf.get_variable("w", [x.get_shape()[1], output_dim])
-	b = tf.get_variable("b", [output_dim], initializer=tf.constant_initializer(0, dtype=tf.float32))
+	b = tf.get_variable("b", [output_dim], initializer=tf.constant_initializer(0.0))
 	return tf.matmul(x, w) + b
 
 
@@ -141,7 +142,7 @@ def read(x, x_hat, h_dec_prev, atten):
 def write(h_dec, atten):
 	if(atten == False):
 		with tf.variable_scope("write", reuse=BUILT):
-			return linear(h_dec, img_size)
+			return linear(h_dec, img_size * channel)
 	else:
 		return
 
