@@ -1,8 +1,8 @@
 import scipy.misc
 
 
-def imread(name, shape):
-    return scipy.misc.imread(name, flatten=True)
+def imread(name):
+    return scipy.misc.imread(name, flatten=False)
 
 
 def imsave(name, array):

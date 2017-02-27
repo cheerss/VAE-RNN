@@ -10,13 +10,13 @@ width, height, channel = 256, 256, 1
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 10
-batch_size = 10
+batch_size = 1
 T = 30
 BUILT = False
 atten = False
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
-data_path= ""
+data_path= "vgg.mat"
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 
 
@@ -27,12 +27,16 @@ def main():
 		# x_reconstr = tf.placeholder(tf.float32, shape=(1, img_size, channel))
 
 		img = imread("img/1-style.jpg")
+		stderr.write(str(img.shape))
 		img_resize = imresize(img, [256, 256])
 		img_float = img_resize.astype('float') / 255
 		imsave('img_resize/1-style.jpg', img_resize)
+		stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
 
 		x_reconstr, Lz = reconstruct(x)
-		Ls = style_loss(x, x_reconstr)
+		x_reshape = tf.reshape(x, [batch_size, width, height])
+		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height])
+		Ls = style_loss(x_reshape, x_reconstr_reshape)
 		loss = Lz + Ls
 
 		train_step = tf.train.Optimizer().minimize(loss)
@@ -75,6 +79,7 @@ def style_loss(x, x_reconstr):
 
 
 def reconstruct(x):
+	global BUILT
 	c = [0] * T
 	mus, sigmas, logsigmas = [0] * T, [0] * T, [0] * T
 	h_dec_prev = tf.zeros((1, dec_size), dtype=tf.float32)
@@ -85,15 +90,17 @@ def reconstruct(x):
 		c_prev = tf.zeros((1, img_size)) if t == 0 else c[t-1]
 		x_hat = x - tf.sigmoid(c_prev)
 		r = read(x, x_hat, h_dec_prev, atten)
-		h_enc, enc_state = encode(r, enc_state)
+		h_enc, enc_state = encode(tf.concat([r, h_dec_prev], 1), enc_state)
 		z, mus[t], logsigmas[t], sigmas[t] = sampleZ(h_enc)
+		stderr.write('size_of z is :' + str(z) + '\n')
 		h_dec, dec_state = decode(z, dec_state)
 		h_dec_prev = h_dec
 		c[t] = c_prev + write(h_dec, atten)
+		stderr.write('size of c[t]: ' + str(c[t]) + '\n')
 		BUILT = True
 	x_reconstr = tf.sigmoid(c[-1])
 
-	Lz = 0;
+	Lz = 0
 	for t in range(T):
 		Lz += tf.square(mus[t]) + tf.square(sigmas[t]) + tf.square(logsigmas[t])
 	Lz = 0.5 * Lz - 0.5 * T
@@ -108,19 +115,19 @@ def linear(x, output_dim):
 
 
 def encode(input, state):
-	with tf.variable_scope("encoder", BUILT):
+	with tf.variable_scope("encoder", reuse=BUILT):
 		return encoder(input, state)
 
 
 def decode(input, state):
-	with tf.variable_scope("decoder", BUILT):
+	with tf.variable_scope("decoder", reuse=BUILT):
 		return decoder(input, state)
 
 
 def sampleZ(h_enc):
-	with tf.variable_scope("mu", BUILT):
+	with tf.variable_scope("mu", reuse=BUILT):
 		mu = linear(h_enc, z_size)
-	with tf.variable_scope("sigma", BUILT):
+	with tf.variable_scope("sigma", reuse=BUILT):
 		logsigma = linear(h_enc, z_size)
 		sigma = tf.exp(logsigma)
 	return tf.random_normal([batch_size, z_size], mean=mu, stddev=sigma, dtype=tf.float32), mu, logsigma, sigma
