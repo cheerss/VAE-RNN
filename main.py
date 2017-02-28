@@ -17,7 +17,7 @@ atten = False
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
-learning_rate = 0.1
+learning_rate = 0.005
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 
 
@@ -50,7 +50,7 @@ def main():
 			if i % 10 == 0:
 				img_reconstr = x_reconstr_reshape.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
-				imsave('img_reconstr/1-style-' + i + '.jpg', img_reconstr)
+				imsave('img_reconstr/1-style-' + str(i) + '.jpg', np.reshape(img_reconstr, [width, height, channel]))
 
 
 def style_loss(x, x_reconstr):
@@ -63,15 +63,17 @@ def style_loss(x, x_reconstr):
 		feature = tf.reshape(feature, (-1, size_origin[3]))
 		gram = tf.matmul(tf.transpose(feature), feature)
 		style_features[layer] = gram
-	x_grams = style_features
 
+	x_grams = {}
 	net, mean = vgg.net(data_path, x_reconstr)
 	for layer in STYLE_LAYERS:
 		feature = net[layer]
 		size_origin = feature.get_shape().as_list()
 		feature = tf.reshape(feature, (-1, size_origin[3]))
-		gram = tf.matmul(tf.transpose(feature), feature)
-		style_features[layer] = gram
+		_, width_f, height_f, num_of_filter = feature.get_shape()
+		stderr.write('_: %g, width_f: %g, height_f: %g, num_of_filter: %g\n' % _, width_f, height_f, num_of_filter)
+		gram = tf.matmul(tf.transpose(feature), feature) / ( _ * width_f * height_f * num_of_filter )
+		x_grams[layer] = gram
 
 	Ls = 0
 	for layer in STYLE_LAYERS:
@@ -105,7 +107,7 @@ def reconstruct(x):
 	Lz = 0
 	for t in range(T):
 		Lz += tf.square(mus[t]) + tf.square(sigmas[t]) + tf.square(logsigmas[t])
-	Lz = 0.5 * Lz - 0.5 * T
+	Lz = 0.5 * tf.reduce_mean(Lz) - 0.5 * T
 
 	return x_reconstr, Lz
 
