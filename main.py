@@ -6,29 +6,30 @@ from utils import *
 from sys import stderr
 
 DEBUG = False
-width, height, channel = 256, 256, 3
+width, height, channel = 128, 128, 3
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 10
 batch_size = 1
-T = 30
+T = 10
 BUILT = False
 atten = False
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
+learning_rate = 0.1
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 
 
 def main():
 	g = tf.Graph()
-	with g.as_default(), tf.Session() as sess:
+	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
 		x = tf.placeholder(tf.float32, shape=(1, img_size * channel))
 		# x_reconstr = tf.placeholder(tf.float32, shape=(1, img_size, channel))
 
 		img = imread("img/1-style.jpg")
 		stderr.write('img shape: ' + str(img.shape) + '\n')
-		img_resize = imresize(img, [256, 256])
+		img_resize = imresize(img, [width, height])
 		img_float = img_resize.astype('float') / 255
 		imsave('img_resize/1-style.jpg', img_resize)
 		stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
@@ -37,17 +38,17 @@ def main():
 		x_reshape = tf.reshape(x, [batch_size, width, height, channel])
 		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height, channel])
 		Ls = style_loss(x_reshape, x_reconstr_reshape)
-		loss = Lz + Ls
+		loss = Ls
 
-		train_step = tf.train.AdamOptimizer().minimize(loss)
-		sess.run(tf.initialize_all_variables())
+		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+		sess.run(tf.global_variables_initializer())
 
+		feed_dict = { x: np.reshape(img_float, [1, -1]) }
 		for i in range(1000):
-			feed_dict = { x: np.reshape(img_float, [1, -1]) }
 			sess.run(train_step, feed_dict)
-			stderr.write("Lz is " + Lz.eval() + "  Ls is " + Ls.eval() + "\n")
+			stderr.write("Lz is " + str(Lz.eval(feed_dict)) + "  Ls is " + str(Ls.eval(feed_dict)) + "\n")
 			if i % 10 == 0:
-				img_reconstr = x_reconstr_reshape.eval()
+				img_reconstr = x_reconstr_reshape.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
 				imsave('img_reconstr/1-style-' + i + '.jpg', img_reconstr)
 
