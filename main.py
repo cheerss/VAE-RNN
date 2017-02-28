@@ -18,7 +18,7 @@ encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
 learning_rate = 0.005
-ratio = 1e-5
+ratio = 1e4
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 
 
@@ -38,8 +38,8 @@ def main():
 		x_reconstr, Lz = reconstruct(x)
 		x_reshape = tf.reshape(x, [batch_size, width, height, channel])
 		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height, channel])
-		Ls = style_loss(x_reshape, x_reconstr_reshape)
-		loss = ratio * Ls + Lz
+		Ls = ratio * style_loss(x_reshape, x_reconstr_reshape)
+		loss = Ls + Lz
 
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 		sess.run(tf.global_variables_initializer())
@@ -62,7 +62,7 @@ def style_loss(x, x_reconstr):
 		size_origin = feature.get_shape().as_list()
 		stderr.write('origin size is ' + str(size_origin) + '\n')
 		feature = tf.reshape(feature, (-1, size_origin[3]))
-		gram = tf.matmul(tf.transpose(feature), feature)
+		gram = tf.matmul(tf.transpose(feature), feature) / reduce(mul, size_origin, 1)
 		style_features[layer] = gram
 
 	x_grams = {}
@@ -76,6 +76,7 @@ def style_loss(x, x_reconstr):
 
 	Ls = 0
 	for layer in STYLE_LAYERS:
+		# stderr.write(str(reduce(mul, x_grams[layer].get_shape().as_list(), 1)))
 		Ls += tf.nn.l2_loss(x_grams[layer] - style_features[layer]) / reduce(mul, x_grams[layer].get_shape().as_list(), 1)
 
 	return Ls
@@ -106,7 +107,7 @@ def reconstruct(x):
 	Lz = 0
 	for t in range(T):
 		Lz += tf.square(mus[t]) + tf.square(sigmas[t]) + tf.square(logsigmas[t])
-	Lz = 0.5 * tf.reduce_mean(Lz) - 0.5 * T
+	Lz = 0.5 * tf.reduce_mean(Lz)
 
 	return x_reconstr, Lz
 
