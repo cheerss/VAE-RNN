@@ -18,6 +18,7 @@ encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
 learning_rate = 0.005
+ratio = 1e-5
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 
 
@@ -38,7 +39,7 @@ def main():
 		x_reshape = tf.reshape(x, [batch_size, width, height, channel])
 		x_reconstr_reshape = tf.reshape(x_reconstr, [batch_size, width, height, channel])
 		Ls = style_loss(x_reshape, x_reconstr_reshape)
-		loss = Ls
+		loss = ratio * Ls + Lz
 
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 		sess.run(tf.global_variables_initializer())
@@ -75,7 +76,7 @@ def style_loss(x, x_reconstr):
 
 	Ls = 0
 	for layer in STYLE_LAYERS:
-		Ls += tf.nn.l2_loss(x_grams[layer] - style_features[layer]) / (size_origin[3] * size_origin[3])
+		Ls += tf.nn.l2_loss(x_grams[layer] - style_features[layer]) / reduce(mul, x_grams[layer].get_shape().as_list(), 1)
 
 	return Ls
 
