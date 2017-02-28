@@ -1,9 +1,9 @@
 import tensorflow as tf
 import vgg
 import numpy as np
-import scipy.misc
 from utils import *
 from sys import stderr
+from operator import mul
 
 DEBUG = False
 width, height, channel = 128, 128, 3
@@ -70,9 +70,7 @@ def style_loss(x, x_reconstr):
 		feature = net[layer]
 		size_origin = feature.get_shape().as_list()
 		feature = tf.reshape(feature, (-1, size_origin[3]))
-		_, width_f, height_f, num_of_filter = feature.get_shape()
-		stderr.write('_: %g, width_f: %g, height_f: %g, num_of_filter: %g\n' % _, width_f, height_f, num_of_filter)
-		gram = tf.matmul(tf.transpose(feature), feature) / ( _ * width_f * height_f * num_of_filter )
+		gram = tf.matmul(tf.transpose(feature), feature) / reduce(mul, size_origin, 1)
 		x_grams[layer] = gram
 
 	Ls = 0
