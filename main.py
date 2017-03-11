@@ -9,57 +9,56 @@ DEBUG = False
 width, height, channel = 128, 128, 3
 img_size = width * height
 enc_size = dec_size = 256
-z_size = 30
+z_size = 60
 batch_size = 1
 T = 10
 read_n = 30 # read glimpse grid width/height
 write_n = 30 # write glimpse grid width/height
 BUILT = False
-atten = True
+atten = False
 read_size = 2*read_n*read_n if atten else 2*img_size
 write_size = write_n*write_n if atten else img_size
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
-learning_rate = 0.001
-ratio_style = 1e2
+learning_rate = 0.003
+ratio_style = 1e1
 ratio_content = 1e1
 eps=1e-8 # epsilon for numerical stability
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
+save_path = "img_recontr_Lx/"
 omiga = (1., 1., 1., 1., 1.)
-
 
 def main():
 	g = tf.Graph()
 	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
-		x = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
-		# x_reconstr = tf.placeholder(tf.float32, shape=(1, img_size, channel))
-		x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
-
-		img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
-		#stderr.write('img shape: ' + str(img.shape) + '\n')
-		img_resize = imresize(imread("img/1-style.jpg"), [width, height])
-		img_float = img_resize.astype('float') / 255
-		imsave('img_resize/1-style.jpg', img_resize)
-		imsave('img_resize/1-content.jpg', img_content)
+		global batch_size, width, height, channel
+		img_content = imread("img/1-content.jpg").astype('float') / 255
+		# stderr.write('img shape: ' + str(img_content.shape) + '\n')
+		img_style = imread("img/1-style.jpg").astype('float') / 255
 		# stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
+		width, height, channel = img_content.shape
+
+		x = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
+		# x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
 
 		x_reconstr, Lz = reconstruct(x)
-		Ls = ratio_style * style_loss(x_reconstr, x)
-		Lx = ratio_content * content_loss(x_content, x_reconstr)
-		loss = Lz + Ls # + Lx
+		# Ls = ratio_style * style_loss(x_reconstr, x)
+		Lx = ratio_content * content_loss(x, x_reconstr)
+		loss = Lx
 
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 		sess.run(tf.global_variables_initializer())
 
-		feed_dict = { x: np.reshape(img_float, [batch_size, width, height, channel]), x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
+		feed_dict = { x: np.reshape(img_content, [batch_size, width, height, channel]) }
+		# feed_dict_ = { x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
 		for i in range(1000):
 			sess.run(train_step, feed_dict)
 			stderr.write("Lz is " + str(Lz.eval(feed_dict)) + "  Ls is " + str(Ls.eval(feed_dict)) + " Lx is " + str(Lx.eval(feed_dict)) + "\n")
 			if i % 10 == 0:
 				img_reconstr = x_reconstr.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
-				imsave('img_reconstr/1-style-' + str(i) + '.jpg', np.reshape(img_reconstr, [width, height, channel]))
+				imsave(save_path + str(i) + '.jpg', np.reshape(img_reconstr, [width, height, channel]))
 
 def content_loss(x, x_reconstr):
 	def binary_crossentropy(t, o):
@@ -101,18 +100,13 @@ def style_loss(x, x_reconstr):
 		Ls += 2 * tf.nn.l2_loss(x_grams[layer] - style_features[layer]) / (4 * M2 * N2) * omiga[i] / all_weights
 		i += 1
 
-	def binary_crossentropy(t, o):
-		return -(t * tf.log(o + eps) + (1.0 - t) * tf.log(1.0 - o + eps))
-
-	Lx = tf.reduce_sum(binary_crossentropy(x, x_reconstr), 1)  # reconstruction term
-	Lx = tf.reduce_mean(Lx)
-
 	return Ls
 
 def seperate(x):
 	return tf.transpose(x, perm=[0, 3, 1, 2])
 def unseperate(x):
 	return tf.transpose(x, perm=[0, 2, 3, 1])
+
 # x: [batch, width, height, channel]
 def reconstruct(x):
 	global BUILT
@@ -125,7 +119,7 @@ def reconstruct(x):
 	x = tf.reshape(x, [batch_size, -1])
 
 	for t in range(T):
-		c_prev = tf.zeros((batch_size, channel * img_size)) if t == 0 else c[t-1]
+		c_prev = tf.zeros((batch_size, channel * width * height)) if t == 0 else c[t-1]
 		x_hat = x - tf.sigmoid(c_prev) # ?
 		r = read(x, x_hat, h_dec_prev, atten)
 		h_enc, enc_state = encode(tf.concat([r, h_dec_prev], 1), enc_state)
@@ -142,7 +136,7 @@ def reconstruct(x):
 	Lz = 0
 	for t in range(T):
 		Lz += tf.square(mus[t]) + tf.square(sigmas[t]) + tf.square(logsigmas[t])
-	Lz = 0.5 * tf.reduce_mean(Lz)
+	Lz = 0.5 * ( tf.reduce_mean(Lz) - T )
 
 	return x_reconstr, Lz
 
@@ -234,7 +228,7 @@ def attn_window(scope,h_dec,N):
 def write(h_dec, atten):
 	if(atten == False):
 		with tf.variable_scope("write", reuse=BUILT):
-			return linear(h_dec, img_size * channel)
+			return linear(h_dec, width * height * channel)
 	else:
 		with tf.variable_scope("writeW", reuse=BUILT):
 			w = linear(h_dec, channel * write_size)  # batch x (write_n*write_n)
