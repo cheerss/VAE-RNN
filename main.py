@@ -6,7 +6,7 @@ from sys import stderr
 from operator import mul
 
 DEBUG = False
-width, height, channel = 128, 128, 3
+width, height, channel = 256, 256, 3
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 60
@@ -33,7 +33,7 @@ def main():
 	g = tf.Graph()
 	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
 		global batch_size, width, height, channel
-		img_content = imread("img/1-content.jpg").astype('float') / 255
+		img_content = imresize(imread("img/1-content.jpg").astype('float') / 255, [width, height])
 		# stderr.write('img shape: ' + str(img_content.shape) + '\n')
 		img_style = imread("img/1-style.jpg").astype('float') / 255
 		# stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
@@ -43,7 +43,7 @@ def main():
 		# x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
 
 		x_reconstr, Lz = reconstruct(x)
-		# Ls = ratio_style * style_loss(x_reconstr, x)
+		Ls = ratio_style * style_loss(x_reconstr, x)
 		Lx = ratio_content * content_loss(x, x_reconstr)
 		loss = Lx
 
