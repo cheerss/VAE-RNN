@@ -6,7 +6,7 @@ from sys import stderr
 from operator import mul
 
 DEBUG = False
-width, height, channel = 256, 256, 3
+width, height, channel = 128, 128, 3
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 60
@@ -21,11 +21,12 @@ write_size = write_n*write_n if atten else img_size
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
 data_path= "vgg.mat"
-learning_rate = 0.003
-ratio_style = 1e1
-ratio_content = 1e1
+learning_rate = 0.0003
+ratio_style = 1e-8
+ratio_content = 1e0
 eps=1e-8 # epsilon for numerical stability
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
+CONTENT_LAYERS = ('relu4_2', 'relu5_2')
 save_path = "img_recontr_Lx/"
 omiga = (1., 1., 1., 1., 1.)
 
@@ -33,37 +34,56 @@ def main():
 	g = tf.Graph()
 	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
 		global batch_size, width, height, channel
-		img_content = imresize(imread("img/1-content.jpg").astype('float') / 255, [width, height])
+		img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
 		# stderr.write('img shape: ' + str(img_content.shape) + '\n')
-		img_style = imread("img/1-style.jpg").astype('float') / 255
+		img_style = imresize(imread("img/6-style.jpg"), [width, height]).astype('float') / 255
+		# img_style = imread("img/3-style.jpg").astype('float') / 255
+		# imsave("img_resize/6-style.jpg", img_style)
 		# stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
 		width, height, channel = img_content.shape
+		width_, height_, channel_ = img_style.shape
 
 		x = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
-		# x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
+		x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
 
 		x_reconstr, Lz = reconstruct(x)
-		Ls = ratio_style * style_loss(x_reconstr, x)
-		Lx = ratio_content * content_loss(x, x_reconstr)
-		loss = Lx
+		Ls = ratio_style * style_loss(x_reconstr * 255, x * 255)
+		Lx = ratio_content * content_loss_(x_content, x_reconstr)
+		loss = Ls + Lz #+ Lx
 
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 		sess.run(tf.global_variables_initializer())
 
-		feed_dict = { x: np.reshape(img_content, [batch_size, width, height, channel]) }
-		# feed_dict_ = { x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
+		feed_dict = { x: np.reshape(img_style, [batch_size, width, height, channel]), x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
 		for i in range(1000):
 			sess.run(train_step, feed_dict)
-			stderr.write("Lz is " + str(Lz.eval(feed_dict)) + "  Ls is " + str(Ls.eval(feed_dict)) + " Lx is " + str(Lx.eval(feed_dict)) + "\n")
+			stderr.write("Lz: " + str(Lz.eval(feed_dict)))
+			stderr.write(" Ls: " + str(Ls.eval(feed_dict)) + "\n")
+			stderr.write(" Lx is " + str(Lx.eval(feed_dict)) + "\n")
 			if i % 10 == 0:
 				img_reconstr = x_reconstr.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
 				imsave(save_path + str(i) + '.jpg', np.reshape(img_reconstr, [width, height, channel]))
 
+def content_loss_(x, x_reconstr):
+	x_features = {}
+	content_losses = []
+	size = reduce(mul, x.get_shape().as_list())
+
+	net, mean = vgg.net(data_path, x)
+	for layer in CONTENT_LAYERS:
+		x_features[layer] = net[layer]
+
+	net, mean = vgg.net(data_path, x_reconstr)
+	for layer in CONTENT_LAYERS:
+		content_losses.append((2 * tf.nn.l2_loss(net[layer] - x_features[layer]) / size))
+
+	content_loss = reduce(tf.add, content_losses)
+	return content_loss
+
 def content_loss(x, x_reconstr):
 	def binary_crossentropy(t, o):
 		return -(t * tf.log(o + eps) + (1.0 - t) * tf.log(1.0 - o + eps))
-
 	Lx = tf.reduce_sum(binary_crossentropy(x, x_reconstr), 1)  # reconstruction term
 	Lx = tf.reduce_mean(Lx)
 
