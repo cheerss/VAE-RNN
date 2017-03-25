@@ -12,7 +12,7 @@ img_size = width_ * height_
 enc_size = dec_size = 256
 z_size = 60
 batch_size = 1
-T = 10
+T = 3
 read_n = 30 # read glimpse grid width/height
 write_n = 30 # write glimpse grid width/height
 BUILT = False
