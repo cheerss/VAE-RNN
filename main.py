@@ -21,7 +21,7 @@ read_size = 2*read_n*read_n if atten else 2*img_size
 write_size = write_n*write_n if atten else img_size
 encoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(enc_size, state_is_tuple=True)
 decoder = tf.contrib.rnn.core_rnn_cell.LSTMCell(dec_size, state_is_tuple=True)
-data_path= "vgg.mat"
+data_path= "../neural-style-bias/vgg.mat"
 learning_rate = 0.0003
 ratio_style = 1e-8
 ratio_content = 1e0
