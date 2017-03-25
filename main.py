@@ -7,6 +7,7 @@ from operator import mul
 
 DEBUG = False
 width, height, channel = 128, 128, 3
+width_, height_, channel_ = 128, 128, 3
 img_size = width * height
 enc_size = dec_size = 256
 z_size = 60
@@ -33,7 +34,7 @@ omiga = (1., 1., 1., 1., 1.)
 def main():
 	g = tf.Graph()
 	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
-		global batch_size, width, height, channel
+		global batch_size, width, height, channel, width_, height_, channel_
 		# img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
 		img_content = imread("img/1-content.jpg").astype('float') / 255
 		# stderr.write('img shape: ' + str(img_content.shape) + '\n')
