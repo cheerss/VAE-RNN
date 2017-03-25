@@ -66,7 +66,7 @@ def main():
 			if i % 10 == 0:
 				img_reconstr = x_reconstr.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
-				imsave(save_path + str(i) + '.jpg', np.reshape(img_reconstr, [width, height, channel]))
+				imsave(save_path + str(i) + '.jpg', np.reshape(img_reconstr, [width_, height_, channel_]))
 
 def content_loss_(x, x_reconstr):
 	x_features = {}
