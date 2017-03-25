@@ -142,7 +142,7 @@ def reconstruct(x):
 	x = tf.reshape(x, [batch_size, -1])
 
 	for t in range(T):
-		c_prev = tf.zeros((batch_size, channel * width * height)) if t == 0 else c[t-1]
+		c_prev = tf.zeros((batch_size, channel_ * width_ * height_)) if t == 0 else c[t-1]
 		x_hat = x - tf.sigmoid(c_prev) # ?
 		r = read(x, x_hat, h_dec_prev, atten)
 		h_enc, enc_state = encode(tf.concat([r, h_dec_prev], 1), enc_state)
@@ -154,7 +154,7 @@ def reconstruct(x):
 		stderr.write('size of c[t]: ' + str(c[t]) + '\n')
 		BUILT = True
 	x_reconstr = tf.sigmoid(c[-1])
-	x_reconstr = unseperate(tf.reshape(x_reconstr, [batch_size, channel, width, height]))
+	x_reconstr = unseperate(tf.reshape(x_reconstr, [batch_size, channel_, width_, height_]))
 
 	Lz = 0
 	for t in range(T):
