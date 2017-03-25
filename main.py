@@ -27,23 +27,25 @@ ratio_content = 1e0
 eps=1e-8 # epsilon for numerical stability
 STYLE_LAYERS = ('relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1')
 CONTENT_LAYERS = ('relu4_2', 'relu5_2')
-save_path = "img_recontr_Lx/"
+save_path = "1-style-big/"
 omiga = (1., 1., 1., 1., 1.)
 
 def main():
 	g = tf.Graph()
 	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
 		global batch_size, width, height, channel
-		img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
+		# img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
+		img_content = imread("img/1-content.jpg").astype('float') / 255
 		# stderr.write('img shape: ' + str(img_content.shape) + '\n')
-		img_style = imresize(imread("img/6-style.jpg"), [width, height]).astype('float') / 255
+		# img_style = imresize(imread("img/1-style.jpg"), [width, height]).astype('float') / 255
+		img_style = imread("img/1-style.jpg").astype('float') / 255
 		# img_style = imread("img/3-style.jpg").astype('float') / 255
-		# imsave("img_resize/6-style.jpg", img_style)
+		imsave("img_resize/1-content.jpg", img_content)
 		# stderr.write('shape of img_float: ' + str(img_float.shape) + '\n')
 		width, height, channel = img_content.shape
 		width_, height_, channel_ = img_style.shape
 
-		x = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
+		x = tf.placeholder(tf.float32, shape=(batch_size, width_, height_, channel_))
 		x_content = tf.placeholder(tf.float32, shape=(batch_size, width, height, channel))
 
 		x_reconstr, Lz = reconstruct(x)
@@ -54,7 +56,7 @@ def main():
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 		sess.run(tf.global_variables_initializer())
 
-		feed_dict = { x: np.reshape(img_style, [batch_size, width, height, channel]), x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
+		feed_dict = { x: np.reshape(img_style, [batch_size, width_, height_, channel_]), x_content: np.reshape(img_content, [batch_size, width, height, channel]) }
 		for i in range(1000):
 			sess.run(train_step, feed_dict)
 			stderr.write("Lz: " + str(Lz.eval(feed_dict)))
