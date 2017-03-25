@@ -62,7 +62,7 @@ def main():
 			sess.run(train_step, feed_dict)
 			stderr.write("Lz: " + str(Lz.eval(feed_dict)))
 			stderr.write(" Ls: " + str(Ls.eval(feed_dict)) + "\n")
-			stderr.write(" Lx is " + str(Lx.eval(feed_dict)) + "\n")
+			# stderr.write(" Lx is " + str(Lx.eval(feed_dict)) + "\n")
 			if i % 10 == 0:
 				img_reconstr = x_reconstr.eval(feed_dict)
 				img_reconstr = (img_reconstr * 255).astype('int')
