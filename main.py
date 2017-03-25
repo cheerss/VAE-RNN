@@ -51,7 +51,7 @@ def main():
 
 		x_reconstr, Lz = reconstruct(x)
 		Ls = ratio_style * style_loss(x_reconstr * 255, x * 255)
-		Lx = ratio_content * content_loss_(x_content, x_reconstr)
+		# Lx = ratio_content * content_loss_(x_content, x_reconstr)
 		loss = Ls + Lz #+ Lx
 
 		train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
