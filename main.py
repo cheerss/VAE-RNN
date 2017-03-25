@@ -33,7 +33,7 @@ omiga = (1., 1., 1., 1., 1.)
 
 def main():
 	g = tf.Graph()
-	with g.as_default(), g.device('/cpu:0'), tf.Session() as sess:
+	with g.as_default(), g.device('/gpu:0'), tf.Session() as sess:
 		global batch_size, width, height, channel, width_, height_, channel_
 		# img_content = imresize(imread("img/1-content.jpg"), [width, height]).astype('float') / 255
 		img_content = imread("img/1-content.jpg").astype('float') / 255
