@@ -8,7 +8,7 @@ from operator import mul
 DEBUG = False
 width, height, channel = 128, 128, 3
 width_, height_, channel_ = 128, 128, 3
-img_size = width * height
+img_size = width_ * height_
 enc_size = dec_size = 256
 z_size = 60
 batch_size = 1
@@ -251,10 +251,10 @@ def attn_window(scope,h_dec,N):
 def write(h_dec, atten):
 	if(atten == False):
 		with tf.variable_scope("write", reuse=BUILT):
-			return linear(h_dec, width * height * channel)
+			return linear(h_dec, width_ * height_ * channel_)
 	else:
 		with tf.variable_scope("writeW", reuse=BUILT):
-			w = linear(h_dec, channel * write_size)  # batch x (write_n*write_n)
+			w = linear(h_dec, channel_ * write_size)  # batch x (write_n*write_n)
 		N = write_n
 		w = tf.reshape(w, [batch_size, channel, N, N])
 		Fx, Fy, gamma = attn_window("write", h_dec, write_n)
@@ -270,7 +270,7 @@ def write(h_dec, atten):
 		# 	w = tf.reshape(tf.tile(w, [3, 1, 1]), [batch_size, 3, w.get_shape().as_list()[1], w.get_shape().as_list()[2]])
 		Fyt = tf.transpose(Fy, perm=[0, 1, 3, 2])
 		wr = tf.matmul(Fyt, tf.matmul(w, Fx))
-		wr = tf.reshape(wr, [batch_size, channel * width * height])
+		wr = tf.reshape(wr, [batch_size, channel_ * width_ * height_])
 		# wr = tf.reshape(tf.transpose(wr, perm=[0, 2, 1]), [batch_size, height * width * channel])
 		# gamma=tf.tile(gamma,[1,height * width * channel])
 		return wr * tf.reshape(1.0 / gamma, [-1, 1])
